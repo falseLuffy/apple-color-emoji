@@ -8,7 +8,11 @@ the current browser or platform does not have native support.
 
 ~~npm install apple-color-emoji~~
 
-clone this repository
+clone this repository 
+
+and
+
+use 
 
 ```
 <script src='./build.js'></script>
