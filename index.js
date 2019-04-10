@@ -1,56 +1,71 @@
-var path = require('path');
+(function (window) {
+  regex = require('./regex');
 
-exports.imageDir = path.join(__dirname, 'images');
-exports.basePath = exports.imageDir;
-exports.regex = require('./regex');
+  // Detect native browser support for emoji
+  nativeSupport = (function () {
+    if (typeof document === 'undefined')
+      return false;
 
-// Detect native browser support for emoji
-exports.nativeSupport = (function() {
-  if (typeof document === 'undefined')
-    return false;
+    var canvas = document.createElement('canvas');
+    if (!canvas.getContext)
+      return false;
 
-  var canvas = document.createElement('canvas');
-  if (!canvas.getContext)
-    return false;
+    var ctx = canvas.getContext('2d');
+    ctx.textBaseline = 'top';
+    ctx.font = '32px sans-serif';
+    ctx.fillText('😃', 0, 0);
 
-  var ctx = canvas.getContext('2d');
-  ctx.textBaseline = 'top';
-  ctx.font = '32px sans-serif';
-  ctx.fillText('😃', 0, 0);
+    return ctx.getImageData(16, 16, 1, 1).data[0] !== 0;
+  })();
 
-  return ctx.getImageData(16, 16, 1, 1).data[0] !== 0;
-})();
+  function getImage(str, basePath) {
+    // strip unicode variation selectors
+    str = str.replace(/[\ufe00-\ufe0f\u200d]/g, '');
 
-function getImage(str) {
-  // strip unicode variation selectors
-  str = str.replace(/[\ufe00-\ufe0f\u200d]/g, '');
+    var name = [];
+    for (var i = 0; i < str.length; i++)
+      name.push(('0000' + str.charCodeAt(i).toString(16)).slice(-4));
 
-  var name = [];
-  for (var i = 0; i < str.length; i++)
-    name.push(('0000' + str.charCodeAt(i).toString(16)).slice(-4));
+    return basePath.replace(/\/$/, '') + '/' + name.join('-') + '.png';
+  }
 
-  return exports.basePath.replace(/\/$/, '') + '/' + name.join('-') + '.png';
-}
+  function Emoji() {
+    this.imageDir = '';
+    this.basePath = '';
+    // make a regex to test whether an entire string is an emoji
+    this.testRegex = new RegExp('^(' + regex.toString().slice(1, -2) + ')$');
+    // Replaces occurrences of emoji in the string with <img> tags
+    // if there is no native support for emoji in the current environment
+    this.replace = function (string) {
+      string = '' + string;
+      if (exports.nativeSupport)
+        return string;
 
-// make a regex to test whether an entire string is an emoji
-var testRegex = new RegExp('^(' + exports.regex.toString().slice(1, -2) + ')$');
+      return string.replace(exports.regex, function (c) {
+        return '<img class="emoji" src="' + getImage(c, this.basePath) + '" alt="' + c + '">';
+      }.bind(this));
+    };
+    // Get the image path for the given emoji string
+    this.getImage = function (chars) {
+      if (!this.testRegex.test(chars))
+        return null;
 
-// Get the image path for the given emoji string
-exports.getImage = function(chars) {
-  if (!testRegex.test(chars))
-    return null;
+      return getImage(chars, this.basePath);
+    };
+  }
 
-  return getImage(chars);
-};
 
-// Replaces occurrences of emoji in the string with <img> tags
-// if there is no native support for emoji in the current environment
-exports.replace = function(string) {
-  string = '' + string;
-  if (exports.nativeSupport)
-    return string;
+  Emoji = new Emonji();
 
-  return string.replace(exports.regex, function(c) {
-    return '<img class="emoji" src="' + getImage(c) + '" alt="' + c + '">';
-  });
-};
+  if (typeof window.define === 'function' && window.define.amd !== undefined) {
+    window.define('Emoji', [], function () {
+      return Emoji;
+    });
+    // CommonJS suppport
+  } else if (typeof module !== 'undefined' && module.exports !== undefined) {
+    module.exports = Emoji;
+    // Default
+  } else {
+    window.Emoji = Emoji;
+  }
+})(this)
